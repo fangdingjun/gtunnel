@@ -5,25 +5,21 @@ A stunnel like util write by golang
 
 There are two work mode.
 
-Client mode
-==========
+###Client mode
 
 In this mode, listen for incoming plain connections and forward to server to use SSL/TLS connections
 
-Server mode
-===========
+###Server mode
 
 In this mode, listen for incoming SSL/TLS connections and forward to backend use plain connections
 
-Build
-====
+###Build
 
     go get github.com/fangdingjun/gtunnel
     cd $GOPATH/src/github.com/fangdingjun/gtunnel
     go build
 
-Usage
-====
+###Usage
 
 server mode
 
