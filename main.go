@@ -1,39 +1,111 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
-	"github.com/fangdingjun/iniflags"
+	"fmt"
+	"io"
 	"log"
+	"net"
 )
 
-var remote string
-
 func main() {
-	var server, client bool
-	flag.StringVar(&remote, "remote", "", "remote server")
-	flag.IntVar(&port, "port", 8080, "the listen port")
-	flag.BoolVar(&server, "server", false, "tls server mode")
-	flag.BoolVar(&client, "client", false, "tls client mode")
-	flag.StringVar(&cert, "cert", "", "the certificate file")
-	flag.StringVar(&key, "key", "", "the private key")
-	iniflags.Parse()
+	var configfile string
 
-	if remote == "" {
-		log.Fatal("please use --remote to special the server")
+	flag.StringVar(&configfile, "c", "config.yaml", "config file")
+	flag.Parse()
+
+	cfg, err := loadConfig(configfile)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	if server {
-		if cert == "" || key == "" {
-			log.Fatal("in server mode, you must special the certificate and private key")
+	initServer(cfg)
+
+	select {}
+}
+
+func initServer(cfg *conf) {
+	for _, srv := range *cfg {
+		go initListener(srv)
+	}
+}
+
+func initListener(srv server) {
+	var l net.Listener
+	var err error
+
+	host := net.JoinHostPort(srv.Listen.Host, fmt.Sprintf("%d", srv.Listen.Port))
+
+	if srv.Listen.Cert != "" && srv.Listen.Key != "" {
+		cert, err := tls.LoadX509KeyPair(srv.Listen.Cert, srv.Listen.Key)
+		if err != nil {
+			log.Fatal(err)
 		}
-		server_main()
+		config := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		}
+
+		l, err = tls.Listen("tcp", host, config)
+	} else {
+		l, err = net.Listen("tcp", host)
+	}
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		go handleConn(conn, srv.Backend)
+	}
+}
+
+func handleConn(conn net.Conn, b backend) {
+	var c net.Conn
+	var err error
+
+	host := net.JoinHostPort(b.Host, fmt.Sprintf("%d", b.Port))
+	if b.TLS {
+		hostname := b.Host
+		if b.Hostname != "" {
+			hostname = b.Hostname
+		}
+		config := &tls.Config{
+			ServerName:         hostname,
+			InsecureSkipVerify: b.Insecure,
+		}
+		c, err = tls.Dial("tcp", host, config)
+	} else {
+		c, err = net.Dial("tcp", host)
+	}
+
+	if err != nil {
+		log.Println(err)
 		return
 	}
 
-	if client {
-		local_main()
-		return
-	}
+	pipeAndClose(conn, c)
+}
 
-	log.Fatal("please use --server or --client to special a work mode")
+func pipeAndClose(c1, c2 net.Conn) {
+	defer c1.Close()
+	defer c2.Close()
+
+	ch := make(chan struct{}, 2)
+	go func() {
+		io.Copy(c1, c2)
+		ch <- struct{}{}
+	}()
+
+	go func() {
+		io.Copy(c2, c1)
+		ch <- struct{}{}
+	}()
+
+	<-ch
 }

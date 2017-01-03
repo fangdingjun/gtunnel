@@ -1,0 +1,57 @@
+# gtunnel can do the follow things
+#  a. listen plain, forward through TLS
+#  b. listen plain, forward through plain
+#  c. listen TLS, forward through plain
+#  d. listen TLS, forward through TLS
+#
+# when cert and key specified it will listen on TLS
+#
+
+-
+    # listen plain and forward through TLS 
+    listen:
+       host: 0.0.0.0
+       port: 4120
+           
+    backend:
+        host: 1.2.3.4
+        port: 443
+
+        # tls sni
+        hostname: example.com
+
+        # use TLS
+        tls: true
+
+        # verify server certificate or not
+        # when set true, will not verify the server's certificate(danger)
+        insecure: false
+
+-
+    # listen tls and forward through plain
+    listen:
+        host: 0.0.0.0
+        port: 443
+        cert: www.crt
+        key: www.key
+
+    backend:
+        host: 127.0.0.1
+        port: 4120
+        tls: false
+
+# more port forwards
+
+#-
+#     # listen TLS, forward through TLS
+#    listen:
+#        host: 0.0.0.0
+#        port: 3122
+#        cert: file.crt
+#        key: file.key
+#
+#    backend:
+#        host: www.example.com
+#        port: 443
+#        hostname: example.com
+#        tls: true
