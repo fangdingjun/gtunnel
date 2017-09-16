@@ -7,7 +7,10 @@ import (
 	"io"
 	"log"
 	"net"
+	"time"
 )
+
+var dialer = &net.Dialer{Timeout: 10 * time.Second}
 
 func main() {
 	var configfile string
@@ -79,9 +82,9 @@ func handleConn(conn net.Conn, b backend) {
 			ServerName:         hostname,
 			InsecureSkipVerify: b.Insecure,
 		}
-		c, err = tls.Dial("tcp", host, config)
+		c, err = tls.DialWithDialer(dialer, "tcp", host, config)
 	} else {
-		c, err = net.Dial("tcp", host)
+		c, err = dialer.Dial("tcp", host)
 	}
 
 	if err != nil {
